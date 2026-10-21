@@ -96,6 +96,9 @@ if ($Backend -eq 'podman') {
     Write-Host "Checking if Docker Desktop is running and docker command is available..."
     try {
         docker info | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "'docker info' exited with code $LASTEXITCODE."
+        }
         Write-Host "Docker Desktop (daemon) is running."
     } catch {
         Write-Error "Docker Desktop is not running or docker command not found."
@@ -112,6 +115,9 @@ try {
         $arguments += '--docker-path', 'podman'
     }
     & devcontainer @arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "'devcontainer up' exited with code $LASTEXITCODE."
+    }
     Write-Host "DevContainer startup process completed."
 } catch {
     Write-Error "Failed to bring up DevContainer: $($_.Exception.Message)"
@@ -123,7 +129,12 @@ Write-Host "Finding the DevContainer ID..."
 $currentFolder = (Get-Location).Path
 
 try {
-    $containerId = (& $Backend ps --filter "label=devcontainer.local_folder=$currentFolder" --format '{{.ID}}').Trim()
+    $containerId = & $Backend ps --filter "label=devcontainer.local_folder=$currentFolder" --format '{{.ID}}'
+    if ($LASTEXITCODE -ne 0) {
+        throw "'$Backend ps' exited with code $LASTEXITCODE."
+    }
+    # Use the first ID. No output leaves $containerId empty, which is reported below.
+    $containerId = "$(@($containerId)[0])".Trim()
 } catch {
     $displayCommand = "$Backend ps --filter `"label=devcontainer.local_folder=$currentFolder`" --format '{{.ID}}'"
     Write-Error "Failed to get container ID (Command: $displayCommand): $($_.Exception.Message)"
